@@ -26,7 +26,7 @@
 
 ## Testing
 
-Comprehensive testing of **Docosphere** was conducted using the **FY 2023-24 Indian Economic Survey** to validate its performance under real-world scenarios.
+Comprehensive testing of **Docosphere** was conducted using the [FY 2023-24 Indian Economic Survey]('https://www.indiabudget.gov.in/economicsurvey/doc/echapter.pdf') to validate its performance under real-world scenarios.
 
 ### Test Categories:
 
@@ -39,7 +39,7 @@ Comprehensive testing of **Docosphere** was conducted using the **FY 2023-24 Ind
    - Example: "Explain the concept of revenue deficit and fiscal deficit in the context of the Union Budget of India."
 
 3. **Hybrid Questions**:
-   - Answerable through either the LLM's intrinsic knowledge or the uploaded document.
+   - Answerable through either the LLM's intrinsic knowledge or the uploaded document, but was answered using LLM's intrinsic knowledge, to avoid unnecessary database calls.
    - Example: "What happened to India’s merchandise trade deficit in FY24?"
 
 ### Test Questions File
