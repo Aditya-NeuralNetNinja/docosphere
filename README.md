@@ -81,3 +81,45 @@ The full set of test questions can be found in the `tests` directory:
    git clone https://github.com/your-repo-name/docosphere.git
    cd docosphere
    ```
+
+2. Create and activate a virtual environment (optional but recommended):
+```python
+python3 -m venv env
+source env/bin/activate  # For Linux/Mac
+env\Scripts\activate     # For Windows
+```
+
+3. Install the required dependencies:
+```python
+pip install -r requirements.txt
+```
+
+4. Running the Application:
+Start the application:
+```python
+streamlit run app.py
+```
+
+5. Open the URL displayed in the terminal (usually http://localhost:8501) to interact with the application.
+
+## Deployment
+The Docosphere prototype is deployed on Hugging Face Spaces using Streamlit for a user-friendly demonstration.
+
+### Steps to Deploy on Hugging Face Spaces:
+1. Set up a [`New Hugging Face Space`](https://huggingface.co/new-space) 
+2. Choose Streamlit as the SDK.
+3. Upload the necessary files:
+```python
+app.py
+utils.py
+requirements.txt
+```
+
+4. Run the application:
+Your app will automatically build and start running on Hugging Face Spaces.
+
+## Future Enhancements
+1. File Format Support: Expand support to include additional formats like Excel, Powerpoint, CSV.
+2. Advanced Analytics: Add retrieval usage analytics for better insights.
+3. Improved Multilingual Support: Integrate more robust multilingual embeddings and vector databases.
+4. Scalability: Optimize for handling larger datasets and concurrent users.
