@@ -77,6 +77,7 @@ The full set of test questions can be found in the `tests` directory:
 ### Setup:
 
 1. Clone the repository:
-   ```bash
+   ```python
    git clone https://github.com/your-repo-name/docosphere.git
    cd docosphere
+   ```
