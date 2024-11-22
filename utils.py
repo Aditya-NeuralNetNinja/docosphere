@@ -1,6 +1,7 @@
 import os
-from typing import List, IO, Tuple
+from typing import List, IO, Tuple, Dict, Any
 from PyPDF2 import PdfReader
+from docx import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import (
     GoogleGenerativeAIEmbeddings,
@@ -8,16 +9,16 @@ from langchain_google_genai import (
 )
 from langchain_community.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
-from langchain.schema import Document
+from langchain.schema import Document as LangchainDocument
 from dotenv import load_dotenv
 import google.generativeai as genai
-import streamlit as st  # For Streamlit functions used in this file
+import streamlit as st 
+import tempfile
 
 # Load environment variables and configure Google API
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
-
 
 def get_pdf_text(pdf_docs: List[IO[bytes]]) -> str:
     """
@@ -35,9 +36,47 @@ def get_pdf_text(pdf_docs: List[IO[bytes]]) -> str:
         for page in pdf_reader.pages:
             page_text = page.extract_text()
             if page_text:
-                text += page_text
+                text += page_text + "\n"
     return text
 
+def get_docx_text(docx_docs: List[IO[bytes]]) -> str:
+    """
+    Extract text content from a list of Word documents.
+
+    Args:
+        docx_docs (List[IO[bytes]]): List of uploaded Word files from Streamlit's file uploader.
+
+    Returns:
+        str: A single string containing concatenated text extracted from all Word documents.
+    """
+    text = ""
+    for docx in docx_docs:
+        # Create a temporary file to handle the uploaded file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_file:
+            try:
+                # Write the uploaded file content to the temporary file
+                temp_file.write(docx.getvalue())
+                temp_file.flush()
+                
+                # Open the document and extract text from paragraphs
+                doc = Document(temp_file.name)
+                doc_text = []
+                for paragraph in doc.paragraphs:
+                    doc_text.append(paragraph.text)
+                
+                text += '\n'.join(doc_text) + "\n"
+                
+            except Exception as e:
+                st.warning(f"Warning: Could not process document {docx.name}: {str(e)}")
+                continue
+            finally:
+                # Clean up the temporary file
+                try:
+                    os.unlink(temp_file.name)
+                except Exception:
+                    pass
+    
+    return text
 
 def get_text_chunks(text: str) -> List[str]:
     """
@@ -47,14 +86,13 @@ def get_text_chunks(text: str) -> List[str]:
         text (str): The raw text to split.
 
     Returns:
-        List[str]: A list of text chunks, each as a string.
+        List[str]: A list of text chunks.
     """
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=10000, chunk_overlap=1000
+        chunk_size=1000,  # Reduced chunk size to match the working example
+        chunk_overlap=200  # Adjusted overlap to match the working example
     )
-    chunks = text_splitter.split_text(text)
-    return chunks
-
+    return text_splitter.split_text(text)
 
 def get_vector_store(text_chunks: List[str]) -> None:
     """
@@ -67,20 +105,20 @@ def get_vector_store(text_chunks: List[str]) -> None:
         None
     """
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    documents = [Document(page_content=chunk) for chunk in text_chunks]
+    documents = [LangchainDocument(page_content=chunk) for chunk in text_chunks]
     vector_store = FAISS.from_documents(documents, embedding=embeddings)
     vector_store.save_local("faiss_index")
-
 
 def get_conversational_chain() -> Tuple[ChatGoogleGenerativeAI, PromptTemplate]:
     """
     Initialize the conversational AI model and prompt template.
 
     Returns:
-        Tuple[ChatGoogleGenerativeAI, PromptTemplate]: A tuple containing the AI model instance and the prompt template.
+        Tuple[ChatGoogleGenerativeAI, PromptTemplate]: Model and prompt template.
     """
     prompt_template = """
-    As a professional assistant, provide a detailed and formally written answer to the question using the provided context. Ensure that the response is professionally formatted and avoids informal language.
+    As a professional assistant, provide a detailed and formally written answer to the question using the provided context. 
+    Ensure that the response is professionally formatted and avoids informal language.
 
     Context:
     {context}
@@ -93,7 +131,8 @@ def get_conversational_chain() -> Tuple[ChatGoogleGenerativeAI, PromptTemplate]:
 
     model = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.3)
     prompt = PromptTemplate(
-        template=prompt_template, input_variables=["context", "question"]
+        template=prompt_template,
+        input_variables=["context", "question"]
     )
     return model, prompt
 
