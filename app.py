@@ -1,6 +1,7 @@
 import streamlit as st
 from utils import (
     get_pdf_text,
+    get_docx_text,
     get_text_chunks,
     get_vector_store,
     user_input,
@@ -30,34 +31,45 @@ def main() -> None:
 
     with col2:
         st.markdown("### 📁 Document Upload")
-        pdf_docs: List[IO[bytes]] = st.file_uploader(
-            "Upload your PDF files",
+        uploaded_files: List[IO[bytes]] = st.file_uploader(
+            "Upload your documents (PDFs or Word files)",
             accept_multiple_files=True,
-            type=["pdf"],
-            help="Select one or more PDF files to analyze"
+            type=["pdf", "docx"],
+            help="Select one or more PDF or Word files to analyze"
         )
 
         if st.button("🚀 Process Documents"):
-            if not pdf_docs:
-                st.warning("📋 Please upload at least one PDF file.")
+            if not uploaded_files:
+                st.warning("📋 Please upload at least one file.")
                 return
 
             with st.spinner("🔄 Processing your documents..."):
-                raw_text: str = get_pdf_text(pdf_docs)
-                text_chunks: List[str] = get_text_chunks(raw_text)
-                get_vector_store(text_chunks)
-                st.success(
-                    "✅ Documents processed successfully! You can now ask questions about your content."
-                )
+                raw_text = ""
+                pdf_docs = [file for file in uploaded_files if file.name.endswith(".pdf")]
+                docx_docs = [file for file in uploaded_files if file.name.endswith(".docx")]
+
+                if pdf_docs:
+                    raw_text += get_pdf_text(pdf_docs)
+                if docx_docs:
+                    raw_text += get_docx_text(docx_docs)
+
+                if raw_text.strip():
+                    text_chunks: List[str] = get_text_chunks(raw_text)
+                    get_vector_store(text_chunks)
+                    st.success(
+                        "✅ Documents processed successfully! You can now ask questions about your content."
+                    )
+                else:
+                    st.warning("⚠️ No content could be extracted from the uploaded files.")
 
         # Add usage instructions
         with st.expander("ℹ️ How to use"):
             st.markdown(
                 """
-                1. Upload one or more PDF files using the uploader above.
-                2. Click 'Process Documents' to analyze the content.
-                3. Type your question in the chat input.
-                4. Get instant answers based on your documents or AI knowledge.
+                - Upload one or more PDF or Word files using the uploader above.
+                - Click 'Process Documents' to analyze the content.
+                - Type your question in the chat input.
+                - Get instant answers based on your documents or AI knowledge.
                 """
             )
 
