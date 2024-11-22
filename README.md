@@ -25,6 +25,8 @@ Webapp hosted on Hugging Face Spaces: [*Live Demo*](https://huggingface.co/space
 
 ## Architecture
 
+![Architecture](https://github.com/Aditya-NeuralNetNinja/docosphere/blob/main/architecture.svg)
+
 ### Key Components
 
 - **Self-Assessing LLMs**: Implements confidence evaluation to decide whether external document retrieval is needed.
