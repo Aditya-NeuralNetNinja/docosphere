@@ -14,18 +14,6 @@ Webapp hosted on Hugging Face Spaces: [*Live Demo*](https://huggingface.co/space
 
 ---
 
-## Features
-
-- **Self-Assessing LLMs**: Implements confidence evaluation to decide whether external document retrieval is needed.
-- **Custom Retrieval Strategies**: Minimizes redundant database calls, reducing them by 40%, using LangChain and tailored prompt engineering.
-- **Document Processing Pipeline**: Handles PDF and Word file processing with Recursive Character Text Splitter for context-preserving chunking.
-- **Semantic Search**: Uses FAISS VectorDB integrated with Google Generative AI embeddings for efficient information retrieval.
-- **Best-in-Class Model**: Incorporates Gemini 1.5 Pro, which provided the highest accuracy and relevance during extensive benchmarking.
-- **Model Testing**: Benchmarked alternative LLMs (Gemma, Llama family) and embeddings (multilingual-e5-large with Pinecone VectorDB) for comparative analysis.
-- **Streamlit UI**: Provides a user-friendly interface deployed on Hugging Face Spaces.
-
----
-
 ## How to Use
 
 1. **Upload Documents**: Drag and drop one or more PDF or Word files using the uploader interface.
@@ -39,11 +27,15 @@ Webapp hosted on Hugging Face Spaces: [*Live Demo*](https://huggingface.co/space
 
 ### Key Components
 
-- **Self-Assessing LLMs**: Dynamically decide between internal knowledge and retrieval-based response.
-- **Document Processing**: Ensures semantic integrity using the Recursive Character Text Splitter.
-- **Semantic Search**: Powered by FAISS VectorDB and advanced embeddings.
-- **LangChain Workflow Orchestration**: Streamlines query handling and response generation.
+- **Self-Assessing LLMs**: Implements confidence evaluation to decide whether external document retrieval is needed.
+- **Custom Retrieval Strategies**: Minimizes redundant database calls, reducing them by 40%, using LangChain and tailored prompt engineering.
+- **Document Processing Pipeline**: Handles PDF and Word file processing with Recursive Character Text Splitter for context-preserving chunking.
+- **Semantic Search**: Uses FAISS VectorDB integrated with Google Generative AI embeddings for efficient information retrieval.
+- **Best-in-Class Model**: Incorporates Gemini 1.5 Pro, which provided the highest accuracy and relevance during extensive benchmarking.
+- **Model Testing**: Benchmarked alternative LLMs (Gemma, Llama family) and embeddings (multilingual-e5-large with Pinecone VectorDB) for comparative analysis.
+- **Streamlit UI**: Provides a user-friendly interface deployed on Hugging Face Spaces.
 
+  
 ### Alternative Approaches Tested
 
 - **Models**: Gemma, Llama LLM families
