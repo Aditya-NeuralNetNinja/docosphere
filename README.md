@@ -41,8 +41,8 @@ Webapp hosted on Hugging Face Spaces: [*Live Demo*](https://huggingface.co/space
 ### Alternative Approaches Tested
 
 - **Models**: Gemma, Llama LLM families
-- **Embeddings**: Multilingual-e5-large with Pinecone VectorDB
-- **Findings**: FAISS + Gemini 1.5 Pro provided superior performance.
+- **Embedding & VectorDB**: Multilingual-e5-large with Pinecone VectorDB; sentence-transformers/all-mpnet-base-v2 with FAISS VectorDB
+- **Findings**: FAISS + Google GenAI embeddings + Gemini-1.5-Pro LLM provided superior performance.
 
 ---
 
