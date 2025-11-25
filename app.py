@@ -1,4 +1,7 @@
 import streamlit as st
+from typing import List, IO
+
+# Import utilities you finalised
 from utils import (
     get_pdf_text,
     get_docx_text,
@@ -6,83 +9,79 @@ from utils import (
     get_vector_store,
     user_input,
 )
-from typing import List, IO
 
+# ---------------------------------------------------------------------------#
+#  Main Streamlit application
+# ---------------------------------------------------------------------------#
 def main() -> None:
-    """
-    Main function to run the Streamlit app.
-
-    Returns:
-        None
-    """
-    # Configure the page
+    # ----- Page configuration ------------------------------------------------
     st.set_page_config(
         page_title="Docosphere",
         page_icon="📄",
         layout="wide"
     )
 
-    # Main header with emoji and subtitle
     st.title("📄 Docosphere")
-    st.markdown("*Where Documents Come Alive ...*")
+    st.markdown("*Where Documents Come Alive …*")
 
-    # Create two columns for better layout
-    col1, col2 = st.columns([2, 1])
+    # Two-column layout: Q&A on left, file upload on right
+    col_left, col_right = st.columns([2, 1])
 
-    with col2:
+    # --------------------- Right column – document upload -------------------
+    with col_right:
         st.markdown("### 📁 Document Upload")
         uploaded_files: List[IO[bytes]] = st.file_uploader(
-            "Upload your documents (PDFs or Word files)",
+            "Upload PDF or Word files",
             accept_multiple_files=True,
             type=["pdf", "docx"],
-            help="Select one or more PDF or Word files to analyze"
+            help="You can select multiple files at once."
         )
 
         if st.button("🚀 Process Documents"):
             if not uploaded_files:
-                st.warning("📋 Please upload at least one file.")
+                st.warning("📋 Please upload at least one file first.")
                 return
 
-            with st.spinner("🔄 Processing your documents..."):
-                raw_text = ""
-                pdf_docs = [file for file in uploaded_files if file.name.endswith(".pdf")]
-                docx_docs = [file for file in uploaded_files if file.name.endswith(".docx")]
+            with st.spinner("🔄 Extracting text & creating vector index…"):
+                combined_text = ""
 
-                if pdf_docs:
-                    raw_text += get_pdf_text(pdf_docs)
-                if docx_docs:
-                    raw_text += get_docx_text(docx_docs)
+                pdfs  = [f for f in uploaded_files if f.name.lower().endswith(".pdf")]
+                docs  = [f for f in uploaded_files if f.name.lower().endswith(".docx")]
 
-                if raw_text.strip():
-                    text_chunks: List[str] = get_text_chunks(raw_text)
-                    get_vector_store(text_chunks)
-                    st.success(
-                        "✅ Documents processed successfully! You can now ask questions about your content."
-                    )
+                if pdfs:
+                    combined_text += get_pdf_text(pdfs)
+                if docs:
+                    combined_text += get_docx_text(docs)
+
+                if combined_text.strip():
+                    chunks = get_text_chunks(combined_text)
+                    get_vector_store(chunks)
+                    st.success("✅ Documents processed! Ask away in the left panel.")
                 else:
-                    st.warning("⚠️ No content could be extracted from the uploaded files.")
+                    st.warning("⚠️ No readable text found in the uploaded files.")
 
-        # Add usage instructions
         with st.expander("ℹ️ How to use"):
             st.markdown(
                 """
-                - Upload one or more PDF or Word files using the uploader above.
-                - Click 'Process Documents' to analyze the content.
-                - Type your question in the chat input.
-                - Get instant answers based on your documents or AI knowledge.
+                1. Upload one or more **PDF** or **Word** documents.\n
+                2. Click **Process Documents** to build the knowledge index.\n
+                3. Ask natural-language questions in the input box (left column).\n
+                4. The assistant will either answer from its own model knowledge or
+                   retrieve context from your documents when needed.
                 """
             )
 
-    with col1:
+    # ---------------------- Left column – chat interface --------------------
+    with col_left:
         st.markdown("### 💬 Ask Your Question")
-        user_question: str = st.text_input(
+        question: str = st.text_input(
             "",
-            placeholder="Type your question here...",
-            help="Ask anything about your uploaded documents or general knowledge"
+            placeholder="Type a question about your documents or general topics…"
         )
 
-        if user_question:
-            user_input(user_question)
+        if question:
+            user_input(question)
 
+# Entry-point guard
 if __name__ == "__main__":
     main()

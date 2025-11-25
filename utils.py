@@ -1,230 +1,108 @@
-import os
-from typing import List, IO, Tuple, Dict, Any
+import os, tempfile, streamlit as st
+from typing import List, IO, Tuple
+from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from docx import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_google_genai import (
-    GoogleGenerativeAIEmbeddings,
-    ChatGoogleGenerativeAI,
-)
-from langchain_community.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
 from langchain.schema import Document as LangchainDocument
-from dotenv import load_dotenv
-import google.generativeai as genai
-import streamlit as st 
-import tempfile
+from langchain_community.vectorstores import FAISS
+from langchain_together.chat_models import ChatTogether
+from langchain_together.embeddings import TogetherEmbeddings        # <-- NEW
+from langchain.prompts import PromptTemplate
 
-# Load environment variables and configure Google API
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=GOOGLE_API_KEY)
 
+# ---------- Helpers ---------------------------------------------------------
+def get_together_api_key() -> str:
+    key = os.getenv("TOGETHER_API_KEY") or st.secrets.get("TOGETHER_API_KEY", None)
+    if not key:
+        raise EnvironmentError("TOGETHER_API_KEY not found in env or Streamlit secrets.")
+    return key
+
+# ---------- File-reading utilities -----------------------------------------
 def get_pdf_text(pdf_docs: List[IO[bytes]]) -> str:
-    """
-    Extract text content from a list of PDF files.
-
-    Args:
-        pdf_docs (List[IO[bytes]]): List of uploaded PDF files from Streamlit's file uploader.
-
-    Returns:
-        str: A single string containing concatenated text extracted from all PDFs.
-    """
-    text = ""
+    txt = ""
     for pdf in pdf_docs:
-        pdf_reader = PdfReader(pdf)
-        for page in pdf_reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-    return text
+        for page in PdfReader(pdf).pages:
+            if (t := page.extract_text()):
+                txt += t + "\n"
+    return txt
 
 def get_docx_text(docx_docs: List[IO[bytes]]) -> str:
-    """
-    Extract text content from a list of Word documents.
-
-    Args:
-        docx_docs (List[IO[bytes]]): List of uploaded Word files from Streamlit's file uploader.
-
-    Returns:
-        str: A single string containing concatenated text extracted from all Word documents.
-    """
-    text = ""
-    for docx in docx_docs:
-        # Create a temporary file to handle the uploaded file
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as temp_file:
-            try:
-                # Write the uploaded file content to the temporary file
-                temp_file.write(docx.getvalue())
-                temp_file.flush()
-                
-                # Open the document and extract text from paragraphs
-                doc = Document(temp_file.name)
-                doc_text = []
-                for paragraph in doc.paragraphs:
-                    doc_text.append(paragraph.text)
-                
-                text += '\n'.join(doc_text) + "\n"
-                
-            except Exception as e:
-                st.warning(f"Warning: Could not process document {docx.name}: {str(e)}")
-                continue
-            finally:
-                # Clean up the temporary file
-                try:
-                    os.unlink(temp_file.name)
-                except Exception:
-                    pass
-    
-    return text
+    txt = ""
+    for d in docx_docs:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+            tmp.write(d.getvalue()); tmp.flush()
+        try:
+            doc = Document(tmp.name)
+            txt += "\n".join(p.text for p in doc.paragraphs) + "\n"
+        finally:
+            os.unlink(tmp.name)
+    return txt
 
 def get_text_chunks(text: str) -> List[str]:
-    """
-    Split text into manageable chunks for processing.
+    return RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200).split_text(text)
 
-    Args:
-        text (str): The raw text to split.
-
-    Returns:
-        List[str]: A list of text chunks.
-    """
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,  # Reduced chunk size to match the working example
-        chunk_overlap=200  # Adjusted overlap to match the working example
-    )
-    return text_splitter.split_text(text)
-
+# ---------- Vector-store build & save --------------------------------------
 def get_vector_store(text_chunks: List[str]) -> None:
-    """
-    Create and save a FAISS vector store from text chunks.
-
-    Args:
-        text_chunks (List[str]): List of text chunks.
-
-    Returns:
-        None
-    """
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    documents = [LangchainDocument(page_content=chunk) for chunk in text_chunks]
-    vector_store = FAISS.from_documents(documents, embedding=embeddings)
+    api_key = get_together_api_key()
+    embeddings = TogetherEmbeddings(model="BAAI/bge-base-en-v1.5", api_key=api_key)
+    vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
 
-def get_conversational_chain() -> Tuple[ChatGoogleGenerativeAI, PromptTemplate]:
-    """
-    Initialize the conversational AI model and prompt template.
-
-    Returns:
-        Tuple[ChatGoogleGenerativeAI, PromptTemplate]: Model and prompt template.
-    """
-    prompt_template = """
-    As a professional assistant, provide a detailed and formally written answer to the question using the provided context. 
-    Ensure that the response is professionally formatted and avoids informal language.
-
-    Context:
-    {context}
-
-    Question:
-    {question}
-
-    Answer:
-    """
-
-    model = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.3)
+# ---------- QA chain helpers ----------------------------------------------
+def get_conversational_chain() -> Tuple[ChatTogether, PromptTemplate]:
+    api_key = get_together_api_key()
+    llm = ChatTogether(model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+                       temperature=0.3, api_key=api_key)
     prompt = PromptTemplate(
-        template=prompt_template,
+        template=(
+            "As a professional assistant, provide a detailed and formally written "
+            "answer to the question using the provided context.\n\nContext:\n{context}\n\n"
+            "Question:\n{question}\n\nAnswer:"
+        ),
         input_variables=["context", "question"]
     )
-    return model, prompt
-
+    return llm, prompt
 
 def self_assess(question: str) -> str:
-    """
-    Determine whether the AI can answer the question directly or needs to search the documents.
-
-    Args:
-        question (str): The user's question.
-
-    Returns:
-        str: The AI's response, which is either the direct answer or 'NEED_RETRIEVAL' if document search is needed.
-    """
-    assessment_prompt = [
-        {
-            "role": "system",
-            "content": "You are an expert assistant who provides professionally formatted and formally written answers.",
-        },
-        {
-            "role": "user",
-            "content": f"""
-            If you are confident in answering the following question based on your existing knowledge,
-            please provide a detailed and formally written answer directly. If you are not confident or require additional information to answer accurately,
-            please respond with 'NEED_RETRIEVAL'.
-
-            Question: {question}
-            """,
-        },
+    api_key = get_together_api_key()
+    llm = ChatTogether(model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+                       temperature=0.3, api_key=api_key)
+    msgs = [
+        {"role": "system", "content": "You are an expert assistant…"},
+        {"role": "user",   "content": (
+            "If you can confidently answer the following question from your own "
+            "knowledge, do so; otherwise reply with 'NEED_RETRIEVAL'.\n\n"
+            f"Question: {question}"
+        )}
     ]
-    model = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.3)
-    response = model.invoke(assessment_prompt)
-    return response.content.strip()  # Removed .upper()
+    return llm.invoke(msgs).content.strip()
 
-
-def process_docs_for_query(docs: List[Document], question: str) -> str:
-    """
-    Process documents to generate an answer to the user's question.
-
-    Args:
-        docs (List[Document]): Relevant documents retrieved from the vector store.
-        question (str): The user's question.
-
-    Returns:
-        str: The AI-generated answer based on the documents.
-    """
+def process_docs_for_query(docs: List[LangchainDocument], question: str) -> str:
     if not docs:
-        return "I apologize, but I couldn't find any relevant information in the provided documents to answer your question."
+        return "Sorry, I couldn’t find relevant info in the documents."
+    ctx = "\n\n".join(d.page_content for d in docs)
+    llm, prompt = get_conversational_chain()
+    return llm.invoke(prompt.format(context=ctx, question=question)).content
 
-    context = "\n\n".join([doc.page_content for doc in docs])
-    model, prompt = get_conversational_chain()
-    formatted_prompt = prompt.format(context=context, question=question)
-    response = model.invoke(formatted_prompt)
-    return response.content
-
-
+# ---------- Main user-query orchestrator -----------------------------------
 def user_input(user_question: str) -> None:
-    """
-    Handle user input, decide whether to search documents or answer directly, and display the response.
-
-    Args:
-        user_question (str): The question entered by the user.
-
-    Returns:
-        None
-    """
     assessment = self_assess(user_question)
-
-    # Display source notification
-    if assessment.strip().upper() == "NEED_RETRIEVAL":
-        st.info("🔍 Searching through your uploaded documents for the answer...")
-        need_retrieval = True
-    else:
-        need_retrieval = False
-        st.info("💡 Answering based on AI's built-in knowledge...")
+    need_retrieval = assessment.upper() == "NEED_RETRIEVAL"
+    st.info("🔍 Searching documents…" if need_retrieval else "💡 Using model knowledge…")
 
     try:
         if need_retrieval:
-            embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-            vector_store = FAISS.load_local(
-                "faiss_index", embeddings, allow_dangerous_deserialization=True
-            )
-            docs = vector_store.similarity_search(user_question)
-            response = process_docs_for_query(docs, user_question)
+            api_key = get_together_api_key()
+            embeddings = TogetherEmbeddings(model="BAAI/bge-base-en-v1.5", api_key=api_key)
+            vs = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+            docs = vs.similarity_search(user_question)
+            answer = process_docs_for_query(docs, user_question)
         else:
-            response = assessment
+            answer = assessment
 
-        # Display the response
         st.markdown("### Answer")
-        st.markdown(f"{response}")
-
-    except Exception:
-        st.error(
-            "⚠️ An error occurred while processing your question. Please make sure you've uploaded and processed your documents first."
-        )
+        st.markdown(answer)
+    except Exception as e:
+        st.error(f"⚠️ Error: {e}")
